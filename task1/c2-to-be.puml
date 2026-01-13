@@ -1,0 +1,81 @@
+@startuml C2_ToBe_GoFuture
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title GoFuture - C2 To-Be (Strangler + Gateway)
+
+Person(passenger, "Passenger", "Пассажир")
+Person(driver, "Driver", "Водитель")
+Person(corporate, "Corporate Client", "Корпоративный клиент")
+
+System_Boundary(gofuture, "GoFuture Platform") {
+
+  Container(gateway, "API Gateway", "HTTP", "Маршрутизация запросов, обратная совместимость (часть в монолит, часть в сервисы)")
+
+  Container(monolith, "Legacy Monolith", "Django", "Оставшаяся функциональность на период миграции")
+
+  Container(booking, "booking-service", "HTTP", "Заказы / поездки")
+  Container(driver_s, "driver-service", "HTTP", "Водители / статусы")
+  Container(pricing, "pricing-service", "HTTP", "Расчёт цены")
+  Container(geo, "geo-service", "HTTP", "Маршруты / геопоиск")
+  Container(payments, "payments-service", "HTTP", "Платежи пассажиров")
+  Container(payouts, "payouts-service", "HTTP", "Выплаты водителям")
+  Container(notification, "notification-service", "HTTP", "Push-уведомления")
+  Container(fraud, "fraud-service", "HTTP", "Подозрительные операции")
+  Container(analytics, "analytics-service", "HTTP", "События / витрины")
+
+  ContainerQueue(event_bus, "Event Bus", "RabbitMQ / Kafka", "Доменные события для интеграций")
+
+  ContainerDb(booking_db, "Booking DB", "PostgreSQL")
+  ContainerDb(driver_db, "Driver DB", "PostgreSQL")
+  ContainerDb(pricing_db, "Pricing DB", "PostgreSQL/Redis")
+  ContainerDb(geo_db, "geo Store", "PostgreSQL/Elastic")
+  ContainerDb(payments_db, "Payments DB", "PostgreSQL")
+  ContainerDb(payouts_db, "Payouts DB", "PostgreSQL")
+  ContainerDb(notification_db, "Notification DB", "PostgreSQL/Redis")
+  ContainerDb(fraud_db, "Fraud DB", "PostgreSQL")
+  ContainerDb(analytics_db, "Analytics DB", "ClickHouse")
+
+}
+
+System_Ext(yandex_pay, "Яндекс Пэй")
+System_Ext(yandex_maps, "Яндекс Карты")
+System_Ext(push, "Push Providers")
+
+Rel(passenger, gateway, "Использует", "HTTPS")
+Rel(driver, gateway, "Использует", "HTTPS")
+Rel(corporate, gateway, "Использует", "HTTPS")
+
+Rel(gateway, monolith, "HTTP")
+Rel(gateway, booking, "HTTP")
+Rel(gateway, driver_s, "HTTP")
+Rel(gateway, pricing, "HTTP")
+Rel(gateway, geo, "HTTP")
+Rel(gateway, payments, "HTTP")
+Rel(gateway, payouts, "HTTP")
+Rel(gateway, notification, "HTTP")
+Rel(gateway, fraud, "HTTP")
+Rel(gateway, analytics, "HTTP")
+
+Rel(booking, booking_db, "Read / write")
+Rel(driver_s, driver_db, "Read / write")
+Rel(pricing, pricing_db, "Read / write")
+Rel(geo, geo_db, "Read / write")
+Rel(payments, payments_db, "Read / write")
+Rel(payouts, payouts_db, "Read / write")
+Rel(notification, notification_db, "Read / write")
+Rel(fraud, fraud_db, "Read / write")
+Rel(analytics, analytics_db, "Read / write")
+
+Rel(payments, yandex_pay, "HTTP")
+Rel(payouts, yandex_pay, "HTTP")
+Rel(geo, yandex_maps, "HTTP")
+Rel(notification, push, "HTTP")
+
+Rel(booking, event_bus, "Publish events", "AMQP")
+Rel(payments, event_bus, "Publish events", "AMQP")
+Rel(driver_s, event_bus, "Publish events", "AMQP")
+Rel(event_bus, analytics, "Consumes events", "AMQP")
+Rel(event_bus, notification, "Consumes events", "AMQP")
+Rel(event_bus, fraud, "Consumes events", "AMQP")
+
+@enduml
