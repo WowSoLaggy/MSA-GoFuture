@@ -1,0 +1,42 @@
+@startuml events.puml
+title gofuture: main events (snake_case)
+top to bottom direction
+
+actor passenger_app
+actor driver_app
+
+rectangle "booking_service" as booking_service
+rectangle "geo_service" as geo_service
+rectangle "driver_service" as driver_service
+rectangle "payment_service" as payment_service
+rectangle "notification_service" as notification_service
+
+' --- Inputs
+passenger_app --> booking_service
+driver_app --> geo_service : location_updated
+driver_app --> driver_service : order_accepted / order_rejected
+
+' --- Main events (publish/consume; transport not shown)
+booking_service --> payment_service : booking_created
+geo_service --> driver_service : location_updated
+driver_service --> payment_service : location_updated
+
+payment_service --> booking_service : price_calculated
+
+' --- Saga as events (no orchestrator)
+booking_service --> driver_service : driver_reserve_requested
+driver_service --> booking_service : driver_reserved\nor driver_reserve_failed
+
+driver_service --> booking_service : driver_accepted / driver_rejected
+
+booking_service --> payment_service : payment_authorize_requested
+payment_service --> booking_service : payment_authorized\nor payment_failed
+
+booking_service --> notification_service : trip_confirmed
+booking_service --> notification_service : booking_cancelled
+
+' --- Compensations (simple)
+booking_service --> payment_service : payment_cancel_requested
+payment_service --> booking_service : payment_cancelled
+
+@enduml

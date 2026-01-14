@@ -1,0 +1,54 @@
+@startuml c2-observability.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(passenger, "Пассажир", "Заказывает поездки")
+Person(driver, "Водитель", "Ездит и шлёт локацию")
+
+System_Boundary(go_future, "GoFuture") {
+  Container(api, "API", "REST", "Принимает запросы, пишет в БД и фиксирует события")
+
+  ContainerDb(service_db, "Service DBs", "PostgreSQL", "Данные доменов")
+  ContainerDb(outbox, "Outbox", "DB table", "События в одной транзакции с данными")
+  Container(cdc, "Outbox Publisher", "Worker/Debezium", "Публикует события в Kafka")
+
+  Container(kafka, "Kafka", "Event Bus", "Доменные события; партиционирование по region")
+  Container(consumers, "Consumers", "Services", "Обработчики событий (Payments/Notifications/...)")
+  Container(stream, "Stream Processing", "Flink/KStreams", "Реалтайм (например, Pricing)")
+
+  Container(saga, "Saga Orchestrator", "Service", "Оркестрация шагов через события/команды")
+  Container(dlq, "DLQ", "Kafka topics", "Сообщения, которые не удалось обработать")
+
+  Container(prom, "Prometheus", "Metrics", "Метрики")
+  Container(graf, "Grafana", "Dashboards", "Дашборды")
+  Container(loki, "Loki", "Logs", "Логи")
+  Container(am, "Alertmanager", "Alerting", "Алерты")
+}
+
+Rel(passenger, api, "HTTPS")
+Rel(driver, api, "HTTPS")
+
+Rel(api, service_db, "read/write", "SQL")
+Rel(api, outbox, "пишет событие вместе с данными", "SQL")
+Rel(cdc, outbox, "читает изменения", "CDC")
+Rel(cdc, kafka, "publish", "Kafka")
+
+Rel(kafka, consumers, "consume", "Kafka")
+Rel(kafka, stream, "consume", "Kafka")
+Rel(stream, kafka, "publish (например, PriceCalculated)", "Kafka")
+
+Rel(kafka, saga, "events", "Kafka")
+Rel(saga, kafka, "commands/events", "Kafka")
+
+Rel(kafka, dlq, "failed messages -> *.dlq", "Kafka")
+
+Rel(api, prom, "metrics", "scrape")
+Rel(consumers, prom, "metrics", "scrape")
+Rel(stream, prom, "metrics", "scrape")
+Rel(kafka, prom, "broker metrics", "exporter/JMX")
+Rel(prom, graf, "dashboards", "PromQL")
+Rel(prom, am, "alerts", "rules")
+Rel(api, loki, "logs", "push")
+Rel(consumers, loki, "logs", "push")
+Rel(stream, loki, "logs", "push")
+
+@enduml

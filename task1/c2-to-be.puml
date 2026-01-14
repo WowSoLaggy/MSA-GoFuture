@@ -1,7 +1,7 @@
-@startuml C2_ToBe_GoFuture
+@startuml c2-to-be.puml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title GoFuture - C2 To-Be (Strangler + Gateway)
+title GoFuture Container Diagram
 
 Person(passenger, "Passenger", "Пассажир")
 Person(driver, "Driver", "Водитель")
