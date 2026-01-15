@@ -1,0 +1,69 @@
+@startuml c2-multitenant.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title GoFuture Multitenant Architecture
+
+Person(passenger, "Пассажир", "role_passenger")
+Person(driver, "Водитель", "role_driver")
+Person(corp_manager, "Корп. менеджер", "role_manager")
+Person(buh, "Бухгалтерия", "role_buh")
+Person(support, "Поддержка", "role_support")
+Person(admin, "Админ", "role_admin")
+
+System_Boundary(gofuture, "GoFuture") {
+  Container(web_apps, "Web / Mobile Apps", "Web / mobile", "Клиенты")
+  Container(api, "API Gateway", "HTTP", "Проверка токена (tenant_id / roles)")
+  Container(app, "GoFuture Services", "Django / Celery", "Бизнес-логика")
+  Container(tenant_router, "Tenant Router", "Middleware", "Маршрутизация в БД по tenant_id")
+
+  Container(portal, "Partner Portal", "Web", "Заявка на подключение партнёра")
+  Container(onboard, "Onboarding Automation", "Jenkins job / script", "IAM + БД + конфиг + мониторинг")
+  ContainerDb(cfg, "Config Store", "PostgreSQL", "Tenant configs")
+
+  ContainerDb(pg_tenant_a, "PostgreSQL (Tenant A)", "PostgreSQL", "DB per tenant")
+  ContainerDb(pg_tenant_b, "PostgreSQL (Tenant B)", "PostgreSQL", "DB per tenant")
+
+  System_Boundary(obs, "Observability") {
+    Container(prom, "Prometheus", "Metrics", "Метрики (по tenant_id)")
+    Container(graf, "Grafana", "Dashboards", "Дашборды")
+    Container(loki, "Loki", "Logs", "Логи (по tenant_id)")
+    Container(am, "Alertmanager", "Alerts", "Алерты")
+  }
+
+  System_Boundary(iam, "IAM / SSO") {
+    Container(idp, "Identity Provider", "OIDC / SAML", "Токен содержит tenant_id + roles")
+  }
+}
+
+Rel(passenger, web_apps, "Использует")
+Rel(driver, web_apps, "Использует")
+Rel(corp_manager, web_apps, "Использует")
+Rel(buh, web_apps, "Использует")
+Rel(support, web_apps, "Использует")
+Rel(admin, web_apps, "Использует")
+
+Rel(web_apps, idp, "SSO login", "OIDC / SAML")
+Rel(web_apps, api, "API calls", "HTTPS")
+Rel(api, app, "HTTP / REST", "HTTP")
+
+Rel(app, tenant_router, "select DB by tenant_id")
+Rel(tenant_router, pg_tenant_a, "read / write", "SQL")
+Rel(tenant_router, pg_tenant_b, "read / write", "SQL")
+
+Rel(app, prom, "sends metrics")
+Rel(app, loki, "sends logs")
+Rel(prom, graf, "dashboards")
+Rel(prom, am, "alerts")
+Rel(loki, graf, "logs query")
+
+Rel(portal, onboard, "run onboarding")
+Rel(onboard, idp, "creates tenants")
+Rel(onboard, pg_tenant_a, "creates DB")
+Rel(onboard, pg_tenant_b, "creates DB")
+Rel(onboard, cfg, "read / write tenant configs")
+Rel(onboard, graf, "onboarding dashboards / alerts")
+Rel(onboard, portal, "returns onboarding details")
+
+Rel(corp_manager, portal, "Подаёт заявку на подключение / получает параметры", "Web")
+
+@enduml
