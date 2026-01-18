@@ -1,0 +1,44 @@
+@startuml data-pipeline.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Data Pipeline
+
+Person(data_user, "BI User", "Аналитика + ML")
+
+System_Boundary(gofuture, "GoFuture Microservices") {
+  Container(booking_svc, "Booking Service", "HTTP + Events", "События поездок/статусов")
+  Container(driver_svc, "Driver Service", "HTTP + Events", "События водителей")
+  Container(pricing_svc, "Pricing Service", "HTTP + Events", "События расчёта цены")
+  Container(payments_svc, "Payments Service", "HTTP + Events", "События платежей")
+  Container(fraud_svc, "Fraud Service", "HTTP + Events", "События / сигналы фрода")
+}
+
+System_Boundary(data_platform, "Data Platform") {
+  Container(event_bus, "Event Bus", "RabbitMQ", "Единая шина событий")
+  Container(stream_proc, "Stream Processing / ETL", "Spark / Flink", "Валидация, очистка, агрегации")
+
+  ContainerDb(archive_store, "Archive Storage", "Files (CSV)", "Архив сырых событий для аудита / сверки")
+  ContainerDb(dwh_clickhouse, "Analytical DB", "ClickHouse", "Витрины / таблицы")
+
+  Container(bi_tool, "BI", "DataLens", "Дашборды и отчёты")
+  Container(obs, "Monitoring", "Prometheus + Grafana", "Мониторинг / метрики")
+}
+
+Rel(booking_svc, event_bus, "publishes events", "AMQP")
+Rel(driver_svc, event_bus, "publishes events", "AMQP")
+Rel(pricing_svc, event_bus, "publishes events", "AMQP")
+Rel(payments_svc, event_bus, "publishes events", "AMQP")
+Rel(fraud_svc, event_bus, "publishes events", "AMQP")
+
+Rel(event_bus, stream_proc, "consumes events", "AMQP")
+Rel(stream_proc, archive_store, "stores events", "batch")
+Rel(stream_proc, dwh_clickhouse, "writes", "batch / stream")
+
+Rel(dwh_clickhouse, bi_tool, "queries", "SQL")
+Rel(data_user, bi_tool, "uses", "")
+Rel(data_user, dwh_clickhouse, "uses for analytics / ML", "SQL")
+
+Rel(stream_proc, obs, "job metrics (lag / errors)", "metrics")
+Rel(dwh_clickhouse, obs, "data checks metrics", "metrics")
+
+@enduml

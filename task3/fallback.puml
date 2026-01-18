@@ -1,0 +1,40 @@
+@startuml fallback.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Region Fallback Diagram
+
+Person(user, "User", "Passenger / Driver")
+
+System_Boundary(global, "Global API") {
+  System(geodns, "GeoDNS", "Routes to closest healthy region")
+}
+
+System_Boundary(sea, "SEA") {
+  System(sea_api, "SEA API", "Regional API")
+  SystemDb(sea_pg, "SEA Primary DB", "Writes")
+}
+
+System_Boundary(sa, "SA") {
+  System(sa_api, "SA API", "Regional API")
+  SystemDb(sa_pg, "SA Primary DB", "Writes")
+}
+
+System_Boundary(eu, "EU") {
+  System(eu_api, "EU API (запасной)", "Fallback API")
+  SystemDb(eu_pg_replica, "EU Replica DB", "becomes primary on fallback")
+}
+
+Rel(user, geodns, "Single API Call")
+
+Rel(geodns, sea_api, "Redirect to SEA")
+Rel(geodns, sa_api, "Redirect to SA")
+Rel(geodns, eu_api, "Redirect to EU (fallback)")
+
+Rel(sea_api, sea_pg, "read / write")
+Rel(sa_api, sa_pg, "read / write")
+Rel(eu_api, eu_pg_replica, "read / write\nin case of fallback")
+
+Rel(sea_pg, eu_pg_replica, "Async replication")
+Rel(sa_pg, eu_pg_replica, "Async replication")
+
+@enduml

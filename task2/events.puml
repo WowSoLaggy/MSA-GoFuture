@@ -1,0 +1,49 @@
+@startuml events.puml
+title gofuture: main events (snake_case)
+top to bottom direction
+
+actor passenger_app
+actor driver_app
+
+rectangle "booking_service" as booking_service
+rectangle "driver_service" as driver_service
+rectangle "payment_service" as payment_service
+rectangle "notification_service" as notification_service
+
+' passenger events
+passenger_app --> booking_service
+booking_service --> payment_service : booking_created
+
+' driver events
+driver_app --> driver_service : location_updated
+booking_service --> driver_service : driver_reserve_requested
+driver_service --> booking_service : driver_reserve_ok /\ndriver_reserve_fail
+
+driver_app --> driver_service : order_accepted /\norder_rejected
+driver_service --> booking_service : driver_accepted /\ndriver_rejected
+
+driver_app --> driver_service : driver_online /\ndriver_offline
+
+' trip lifecycle events
+driver_app --> driver_service : trip_started /\ntrip_completed
+driver_service --> booking_service : trip_started /\ntrip_completed
+
+' payment events
+payment_service --> booking_service : price_calculated
+booking_service --> payment_service : payment_authorize_requested
+payment_service --> booking_service : payment_ok /\npayment_fail
+booking_service --> payment_service : payment_capture_requested
+payment_service --> booking_service : payment_captured /\npayment_capture_fail
+payment_service --> booking_service : receipt_issued
+
+' notification events
+booking_service --> notification_service : trip_confirmed
+booking_service --> notification_service : booking_cancelled
+booking_service --> notification_service : trip_started
+booking_service --> notification_service : trip_completed
+
+' compensation events
+booking_service --> payment_service : payment_cancel_requested
+payment_service --> booking_service : payment_cancelled
+
+@enduml
